@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>溫習月曆表</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            display: flex;
+        }
+
+        .subject-list {
+            width: 200px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-right: 20px;
+        }
+
+        .calendar-container {
+            flex: 1;
+        }
+
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+
+        .day {
+            border: 1px solid #ccc;
+            padding: 10px;
+            min-height: 200px;
+            position: relative;
+        }
+
+        .day h3 {
+            margin-top: 0;
+            margin-bottom: 5px;
+        }
+
+        .subject {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 5px;
+            margin-bottom: 5px;
+            cursor: move;
+            position: relative;
+        }
+
+        .subject>div {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .add-subject-form {
+            margin-bottom: 10px;
+        }
+
+        .time-slot {
+            margin-bottom: 5px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+        }
+
+        .notes {
+            margin-top: 10px;
+        }
+
+        .notes textarea {
+            width: 100%;
+            height: 80px;
+            margin-bottom: 5px;
+        }
+
+        .time-slots-container {
+            margin-top: 5px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        select,
+        textarea,
+        input[type="text"] {
+            width: 100%;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+
+        .total-hours {
+            white-space: nowrap;
+            /* 防止 "H" 飛上去 */
+        }
+
+        .delete-button {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: #888;
+        }
+
+        /* 樣式調整以適應小螢幕 */
+        @media (max-width: 600px) {
+            body {
+                flex-direction: column;
+            }
+
+            .subject-list {
+                width: 100%;
+                margin-right: 0;
+                margin-bottom: 20px;
+            }
+
+            .calendar {
+                grid-template-columns: repeat(1, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="subject-list">
+        <h2>科目列表</h2>
+        <div class="add-subject-form">
+            <input type="text" id="newSubject" placeholder="新增科目">
+            <button onclick="addSubject()">新增</button>
+        </div>
+        <div id="subjects">
+            <div class="subject" draggable="true" data-subject="CHIN">
+                <div>
+                    CHIN
+                    <span class="total-hours">(0 H)</span>
+                </div>
+            </div>
+            <div class="subject" draggable="true" data-subject="ENG">
+                <div>
+                    ENG
+                    <span class="total-hours">(0 H)</span>
+                </div>
+            </div>
+            <div class="subject" draggable="true" data-subject="MATH">
+                <div>
+                    MATH
+                    <span class="total-hours">(0 H)</span>
+                </div>
+            </div>
+        </div>
+        <button onclick="saveCalendar()">儲存</button>
+        <button onclick="loadCalendar()">載入</button>
+    </div>
+    <div class="calendar-container">
+        <h1>溫習月曆表</h1>
+        <div id="calendarContainer">
+            <!-- 月曆將由 JavaScript 動態生成 -->
+        </div>
+    </div>
+    <script>
+        const calendarContainer = document.getElementById('calendarContainer');
+        const subjectsDiv = document.getElementById('subjects');
+        let draggedSubject = null;
+
+        // 時間選項
+        function generateTimeOptions() {
+            let options = '';
+            for (let i = 0; i < 24; i++) {
+                const hour = String(i).padStart(2, '0');
+                options += `<option value="${hour}:00">${hour}:00</option>`;
+                options += `<option value="${hour}:30">${hour}:30</option>`;
+            }
+            return options;
+        }
+
+        // 生成日曆
+        function generateCalendar(startDate, endDate) {
+            let currentDate = new Date(startDate);
+
+            while (currentDate <= endDate) {
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth() + 1;
+                const day = currentDate.getDate();
+
+                const calendarDiv = document.createElement('div');
+                calendarDiv.classList.add('calendar');
+
+                const title = document.createElement('h2');
+                title.textContent = `${year} 年 ${month} 月`;
+                calendarContainer.appendChild(title);
+                calendarContainer.appendChild(calendarDiv);
+
+                const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+                weekdays.forEach(weekday => {
+                    const dayHeader = document.createElement('div');
+                    dayHeader.textContent = weekday;
+                    calendarDiv.appendChild(dayHeader);
+                });
+
+                let firstDayOfMonth = new Date(year, month - 1, 1);
+                let startingDay = firstDayOfMonth.getDay();
+
+                for (let i = 0; i < startingDay; i++) {
+                    const emptyDay = document.createElement('div');
+                    calendarDiv.appendChild(emptyDay);
+                }
+
+                let daysInMonth = new Date(year, month, 0).getDate();
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const dayDiv = document.createElement('div');
+                    dayDiv.classList.add('day');
+                    dayDiv.innerHTML = `<h3>${i}</h3>`;
+                    dayDiv.dataset.day = i;
+                    calendarDiv.appendChild(dayDiv);
+
+                    dayDiv.addEventListener('dragover', allowDrop);
+                    dayDiv.addEventListener('drop', drop);
+                }
+
+                currentDate.setDate(currentDate.getDate() + 1);
+                if (currentDate > endDate) break;
+            }
+        }
+
+        // 允許放置
+        function allowDrop(event) {
+            event.preventDefault();
+        }
+
+        // 開始拖動科目
+        subjectsDiv.addEventListener('dragstart', (event) => {
+            draggedSubject = event.target;
+        });
+
+        // 放置科目
+        function drop(event) {
+            event.preventDefault();
+            if (draggedSubject && draggedSubject.classList.contains('subject')) {
+                const subject = draggedSubject.cloneNode(true);
+                subject.draggable = false;
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'X';
+                deleteButton.classList.add('delete-button');
+                deleteButton.style.position = 'absolute';
+                deleteButton.style.top = '5px';
+                deleteButton.style.right = '5px';
+                deleteButton.onclick = function () {
+                    const dayDiv = subject.parentNode;
+                    removeNotesAndLocation(dayDiv);
+                    subject.remove();
+                    updateTotalHours(subject.dataset.subject, 0);
+                    saveCalendar();
+                };
+                subject.appendChild(deleteButton);
+
+                const dayDiv = event.target;
+
+                addTimeAllocation(subject);
+                addNotesAndLocation(dayDiv);
+
+                dayDiv.appendChild(subject);
+                draggedSubject = null;
+
+                saveCalendar(); // 儲存日曆
+            }
+        }
+
+        // 新增科目
+        function addSubject() {
+            const newSubjectInput = document.getElementById('newSubject');
+            const newSubjectName = newSubjectInput.value.trim();
+
+            if (newSubjectName !== "") {
+                const newSubjectDiv = document.createElement('div');
+                newSubjectDiv.classList.add('subject');
+                newSubjectDiv.draggable = true;
+                newSubjectDiv.dataset.subject = newSubjectName;
+                newSubjectDiv.innerHTML = `
+                    <div>
+                        ${newSubjectName}
+                        <span class="total-hours">(0 H)</span>
+                    </div>
+                `;
+
+                subjectsDiv.appendChild(newSubjectDiv);
+                newSubjectInput.value = "";
+
+                saveCalendar(); // 儲存日曆
+            }
+        }
+
+        // 添加時間分配功能
+        function addTimeAllocation(subject) {
+            const timeAllocationDiv = document.createElement('div');
+            timeAllocationDiv.classList.add('time-slots-container');
+            timeAllocationDiv.innerHTML = `
+                <table>
+                    <tr>
+                        <td><label>時間安排:</label></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <select class="start-time">
+                                ${generateTimeOptions()}
+                            </select>
+                            -
+                            <select class="end-time">
+                                ${generateTimeOptions()}
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+            `;
+            const startTimeSelect = timeAllocationDiv.querySelector('.start-time');
+            const endTimeSelect = timeAllocationDiv.querySelector('.end-time');
+
+            // 確保事件監聽器附加到正確的元素上
+            if (startTimeSelect && endTimeSelect) {
+                startTimeSelect.addEventListener('change', updateHours);
+                endTimeSelect.addEventListener('change', updateHours);
+            }
+
+            subject.appendChild(timeAllocationDiv);
+        }
+
+        // 更新時間
+        function updateHours(event) {
+            const container = event.target.closest('.time-slots-container'); // 找到最近的 time-slots-container
+            const startTimeSelect = container.querySelector('.start-time');
+            const endTimeSelect = container.querySelector('.end-time');
+            const startTime = startTimeSelect.value;
+            const endTime = endTimeSelect.value;
+
+            if (startTime && endTime) {
+                const start = new Date(`2025-05-18 ${startTime}`);
+                const end = new Date(`2025-05-18 ${endTime}`);
+
+                if (end > start) {
+                    const diff = end.getTime() - start.getTime();
+                    const hours = diff / (1000 * 60 * 60);
+                    const subjectDiv = container.parentNode;
+                    const subjectName = subjectDiv.dataset.subject;
+                    updateTotalHours(subjectName, hours);
+                } else {
+                    alert('結束時間必須在開始時間之後');
+                    startTimeSelect.value = '';
+                    endTimeSelect.value = '';
+                }
+            }
+        }
+
+
+        // 更新科目總時間
+        function updateTotalHours(subjectName, hours) {
+            const subjectDivs = document.querySelectorAll('.subject');
+            subjectDivs.forEach(div => {
+                if (div.dataset.subject === subjectName) {
+                    const totalHoursSpan = div.querySelector('.total-hours');
+                    totalHoursSpan.textContent = `(${parseFloat(hours).toFixed(1)} H)`;
+                }
+            });
+            saveCalendar();
+        }
+
+        // 添加筆記和地點
+        function addNotesAndLocation(dayDiv) {
+            const notesDiv = document.createElement('div');
+            notesDiv.classList.add('notes');
+            notesDiv.innerHTML = `
+                <table>
+                    <tr>
+                        <td><label>筆記:</label></td>
+                        <td>
+                            <select id="noteSelect-${dayDiv.dataset.day}">
+                                <option value="">請選擇筆記</option>
+                                <option value="複習重點">複習重點</option>
+                                <option value="作業提醒">作業提醒</option>
+                                <option value="考試範圍">考試範圍</option>
+                                <option value="其他">其他</option>
+                            </select>
+                            <textarea id="customNote-${dayDiv.dataset.day}" placeholder="自定義筆記" style="display:none;"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><label>需要地點?</label></td>
+                        <td>
+                            <input type="checkbox" id="locationCheckbox-${dayDiv.dataset.day}" onchange="toggleLocationInput(this, '${dayDiv.dataset.day}')">
+                            <div id="locationInput-${dayDiv.dataset.day}" style="display:none;">
+                                <label>地點:</label>
+                                <input type="text" placeholder="地點">
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            `;
+            dayDiv.appendChild(notesDiv);
+
+            const noteSelect = document.getElementById(`noteSelect-${dayDiv.dataset.day}`);
+            const customNoteTextarea = document.getElementById(`customNote-${dayDiv.dataset.day}`);
+
+            noteSelect.addEventListener('change', function () {
+                if (noteSelect.value === '其他') {
+                    customNoteTextarea.style.display = 'block';
+                } else {
+                    customNoteTextarea.style.display = 'none';
+                }
+            });
+        }
+
+        // 移除筆記和地點
+        function removeNotesAndLocation(dayDiv) {
+            const notesDiv = dayDiv.querySelector('.notes');
+            if (notesDiv) {
+                notesDiv.remove();
+            }
+        }
+
+        // 顯示/隱藏地點輸入框
+        function toggleLocationInput(checkbox, day) {
+            const locationInput = document.getElementById(`locationInput-${day}`);
+            locationInput.style.display = checkbox.checked ? 'block' : 'none';
+        }
+
+        // 儲存日曆
+        function saveCalendar() {
+            const calendarData = {
+                subjects: Array.from(subjectsDiv.children).map(subject => {
+                    return {
+                        subjectName: subject.dataset.subject,
+                        totalHours: subject.querySelector('.total-hours').textContent
+                    };
+                }),
+                days: Array.from(document.querySelectorAll('.day')).map(day => {
+                    return {
+                        day: day.dataset.day,
+                        subjects: Array.from(day.querySelectorAll('.subject')).map(subject => {
+                            return {
+                                subjectName: subject.dataset.subject,
+                                totalHours: subject.querySelector('.total-hours').textContent
+                            };
+                        })
+                    };
+                })
+            };
+            sessionStorage.setItem('calendarData', JSON.stringify(calendarData));
+            console.log('日曆已儲存');
+        }
+
+        // 載入日曆
+        function loadCalendar() {
+            const storedCalendarData = sessionStorage.getItem('calendarData');
+            if (storedCalendarData) {
+                const calendarData = JSON.parse(storedCalendarData);
+
+                // 載入科目
+                subjectsDiv.innerHTML = '';
+                calendarData.subjects.forEach(subjectData => {
+                    const newSubjectDiv = document.createElement('div');
+                    newSubjectDiv.classList.add('subject');
+                    newSubjectDiv.draggable = true;
+                    newSubjectDiv.dataset.subject = subjectData.subjectName;
+                    newSubjectDiv.innerHTML = `
+                        <div>
+                            ${subjectData.subjectName}
+                            <span class="total-hours">${subjectData.totalHours}</span>
+                        </div>
+                    `;
+                    subjectsDiv.appendChild(newSubjectDiv);
+                });
+
+                // 載入日期
+                const days = document.querySelectorAll('.day');
+                days.forEach(day => {
+                    day.innerHTML = `<h3>${day.dataset.day}</h3>`; // 保留日期
+                    calendarData.days.forEach(dayData => {
+                        if (day.dataset.day === dayData.day) {
+                            dayData.subjects.forEach(subjectData => {
+                                const newSubjectDiv = document.createElement('div');
+                                newSubjectDiv.classList.add('subject');
+                                newSubjectDiv.draggable = false;
+                                newSubjectDiv.dataset.subject = subjectData.subjectName;
+                                newSubjectDiv.innerHTML = `
+                                    <div>
+                                        ${subjectData.subjectName}
+                                        <span class="total-hours">${subjectData.totalHours}</span>
+                                    </div>
+                                `;
+                                day.appendChild(newSubjectDiv);
+                            });
+                        }
+                    });
+                });
+
+                console.log('日曆已載入');
+            } else {
+                alert('未找到儲存的日曆資料');
+            }
+        }
+
+
+        // 初始化日曆
+        const startDate = new Date(); // 今天
+        const endDate = new Date(2025, 5, 23); // 6 月 23 日
+        generateCalendar(startDate, endDate);
+    </script>
+</body>
+
+</html>
